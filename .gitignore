@@ -1,6 +1,6 @@
 #twiapi
-./twsapi_macunix/*
-./bin/*
+twsapi_macunix/
+bin/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -635,3 +635,4 @@ twsapi_macunix/IBJts/source/proto/OrderStatus.proto
 twsapi_macunix/IBJts/source/proto/PlaceOrderRequest.proto
 twsapi_macunix/IBJts/source/proto/SoftDollarTier.proto
 twsapi_macunix/META-INF/MANIFEST.MF
+twsapi_macunix/IBJts/samples/Python/Testbed/.gitignore
