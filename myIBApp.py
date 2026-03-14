@@ -13,6 +13,10 @@ CLIENT_ID = 0
 LOGGING_ENABLED = False
 
 
+# Singleton connection variables
+_singleton_app = None
+_api_thread = None
+
 class myIBApp(EWrapper, EClient):
     def __init__(self):
         EWrapper.__init__(self)
@@ -75,18 +79,24 @@ class myIBApp(EWrapper, EClient):
         print(f"symbol: {contract.symbol}, secType: {contract.secType}, exchange: {contract.exchange}, currency: {contract.currency}")
         return contract
 
-    
-
 def connect_to_tws():
+    global _singleton_app, _api_thread
+    if _singleton_app is not None:
+        return _singleton_app
     app = myIBApp()
     app.connect(HOST, PORT, CLIENT_ID)
     print("serverVersion:%s connectionTime:%s" % (app.serverVersion(), app.twsConnectionTime()))
-
     # Run the socket in a background thread
     api_thread = threading.Thread(target=app.run, daemon=True)
     api_thread.start()
 
     # Wait for connection
     time.sleep(1)
-
+    _singleton_app = app
     return app
+
+def disconnect_tws():
+    global _singleton_app
+    if _singleton_app is not None:
+        _singleton_app.disconnect()
+        _singleton_app = None

@@ -4,9 +4,7 @@ import time
 TICKERS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
 TIMEOUT = 60         # seconds to wait for data
 
-def get_stock_prices(tickers: list) -> dict:
-    app = myIBApp.connect_to_tws()
-    
+def get_stock_prices(app: myIBApp, tickers: list) -> dict:    
     print(f"\nRequesting prices for: {tickers}\n")
 
     # Request a snapshot for each ticker
@@ -17,7 +15,7 @@ def get_stock_prices(tickers: list) -> dict:
         app.data_received[req_id] = False
         contract = app.make_stock_contract(ticker)
         # snapshot=True requests a one-time price snapshot instead of streaming
-        app.reqMarketDataType(3) 
+        app.reqMarketDataType(3)
         app.reqMktData(req_id, contract, "", True, False, [])
 
     # Wait until all data is received or timeout
@@ -30,12 +28,11 @@ def get_stock_prices(tickers: list) -> dict:
             break
         time.sleep(0.1)
     print("timeout reached or all data received. Responses:", app.prices)
-    app.disconnect()
     return app.prices
 
-
 if __name__ == "__main__":
-    prices = get_stock_prices(TICKERS)
-
+    app = myIBApp.connect_to_tws()
+    prices = get_stock_prices(app, TICKERS)
     print(f"\n--- Final Prices ---\n{prices}")
+    myIBApp.disconnect_tws()
 

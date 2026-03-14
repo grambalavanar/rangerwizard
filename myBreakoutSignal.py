@@ -1,7 +1,7 @@
 import myIBApp
 import time
 
-TICKER = "XOM"
+TICKER = "V"
 TIMEOUT = 60  # seconds to wait for data
 BAR_COUNT = 20  # Number of bars for breakout lookback
 
@@ -34,6 +34,7 @@ def breakout_signal(prices, lookback=BAR_COUNT):
     return signals
 
 def get_breakout_signals(
+    app,
     ticker=TICKER,
     timeout=TIMEOUT,
     bar_count=BAR_COUNT,
@@ -45,7 +46,6 @@ def get_breakout_signals(
     keep_up_to_date=KEEP_UP_TO_DATE,
     extra_params=EXTRA_PARAMS
 ):
-    app = myIBApp.connect_to_tws()
     print(f"\nRequesting historical data for: {ticker}\n")
 
     req_id = 1
@@ -90,8 +90,6 @@ def get_breakout_signals(
             break
         time.sleep(0.1)
 
-    app.disconnect()
-
     if len(app.bars) < bar_count:
         print("Not enough bars received.")
         return None
@@ -100,28 +98,29 @@ def get_breakout_signals(
     print(f"\n--- Breakout Signals for {ticker} ---")
     for idx, signal in enumerate(signals, start=bar_count):
         print(f"Bar {idx}: Price={app.bars[idx]}, Signal={signal}")
+    # ASCII plot
+    print(f"\n{TICKER}")
+    y_map = {'buy': 1, 'sell': -1, None: 0}
+    y_labels = {1: ' B ', 0: ' . ', -1: ' S '}
+    plot_height = 3
+    plot = [['   ' for _ in range(len(signals))] for _ in range(plot_height)]
+    for i, signal in enumerate(signals):
+        y = y_map[signal]
+        row = 1 - y  # 1: buy (top), 1: none (middle), 2: sell (bottom)
+        plot[row][i] = y_labels[y]
+    for row_idx, row in enumerate(plot):
+        if row_idx == 0:
+            label = 'BUY '
+        elif row_idx == 1:
+            label = 'NONE'
+        else:
+            label = 'SELL'
+        print(label + '|' + ''.join(row))
+    print('     ' + '-' * (len(signals) * 3))
+    print('     ' + ''.join([f'{i+BAR_COUNT:3}' for i in range(len(signals))]))
     return signals
 
 if __name__ == "__main__":
-    signals = get_breakout_signals()
-    # Print ASCII cartesian plot at the end, titled by ticker
-    if signals:
-        print(f"\n{TICKER}")
-        y_map = {'buy': 1, 'sell': -1, None: 0}
-        y_labels = {1: ' B ', 0: ' . ', -1: ' S '}
-        plot_height = 3
-        plot = [['   ' for _ in range(len(signals))] for _ in range(plot_height)]
-        for i, signal in enumerate(signals):
-            y = y_map[signal]
-            row = 1 - y  # 1: buy (top), 1: none (middle), 2: sell (bottom)
-            plot[row][i] = y_labels[y]
-        for row_idx, row in enumerate(plot):
-            if row_idx == 0:
-                label = 'BUY '
-            elif row_idx == 1:
-                label = 'NONE'
-            else:
-                label = 'SELL'
-            print(label + '|' + ''.join(row))
-        print('     ' + '-' * (len(signals) * 3))
-        print('     ' + ''.join([f'{i+BAR_COUNT:3}' for i in range(len(signals))]))
+    app = myIBApp.connect_to_tws()
+    get_breakout_signals(app)
+    myIBApp.disconnect_tws()

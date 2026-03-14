@@ -17,6 +17,7 @@ import time
 
 
 def get_moving_average(
+    app,
     ticker=TICKER,
     timeout=TIMEOUT,
     bar_count=BAR_COUNT,
@@ -28,7 +29,6 @@ def get_moving_average(
     keep_up_to_date=KEEP_UP_TO_DATE,
     extra_params=EXTRA_PARAMS
 ) -> float:
-    app = myIBApp.connect_to_tws()
     print(f"\nRequesting historical data for: {ticker}\n")
 
     req_id = 1
@@ -73,8 +73,6 @@ def get_moving_average(
             break
         time.sleep(0.1)
 
-    app.disconnect()
-
     if len(app.bars) < bar_count:
         print("Not enough bars received.")
         return None
@@ -84,4 +82,6 @@ def get_moving_average(
     return moving_avg
 
 if __name__ == "__main__":
-    get_moving_average()
+    app = myIBApp.connect_to_tws()
+    get_moving_average(app)
+    myIBApp.disconnect_tws()
