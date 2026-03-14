@@ -1,5 +1,6 @@
 #twiapi
-./twsapi_macunix
+./twsapi_macunix/*
+./bin/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
