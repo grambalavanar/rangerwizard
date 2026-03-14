@@ -6,8 +6,8 @@ from ibapi.contract import Contract
 
 # --- Configuration ---
 HOST = "127.0.0.1"
-PORT = 7497          # 7497 for TWS paper, 7496 for TWS live, 4002 for IB Gateway paper
-CLIENT_ID = 1
+PORT = 7496          # 7497 for TWS paper, 7496 for TWS live, 4002 for IB Gateway paper
+CLIENT_ID = U24689401
 TICKERS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
 TIMEOUT = 10         # seconds to wait for data
 
