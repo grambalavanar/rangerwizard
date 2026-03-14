@@ -80,8 +80,7 @@ class myIBApp(EWrapper, EClient):
 def connect_to_tws():
     app = myIBApp()
     app.connect(HOST, PORT, CLIENT_ID)
-    print("serverVersion:%s connectionTime:%s" % (app.serverVersion(),
-                                                      app.twsConnectionTime()))
+    print("serverVersion:%s connectionTime:%s" % (app.serverVersion(), app.twsConnectionTime()))
 
     # Run the socket in a background thread
     api_thread = threading.Thread(target=app.run, daemon=True)
