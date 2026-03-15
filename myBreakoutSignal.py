@@ -4,7 +4,7 @@ import argparse
 
 # --- Constants ---
 TICKER = "V"
-BAR_COUNT = 20
+BAR_COUNT = 100
 TIMEOUT = 60
 DURATION_STR = "1 Y"
 BAR_SIZE_SETTING = "1 W"
