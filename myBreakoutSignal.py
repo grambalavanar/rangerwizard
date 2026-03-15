@@ -2,6 +2,19 @@ import myIBApp
 import time
 import argparse
 
+# --- Constants ---
+TICKER = "V"
+BAR_COUNT = 20
+TIMEOUT = 60
+DURATION_STR = "1 Y"
+BAR_SIZE_SETTING = "1 W"
+WHAT_TO_SHOW = "TRADES"
+USE_RTH = 1
+FORMAT_DATE = 1
+KEEP_UP_TO_DATE = False
+EXTRA_PARAMS = []
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Breakout Signal Script")
     parser.add_argument('--ticker', type=str, default="V", help='Ticker symbol')

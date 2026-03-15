@@ -93,8 +93,42 @@ def run_backtest(
     )
     print(f"\n--- Backtest Results for {ticker} ---")
     for idx, signal in enumerate(signals, start=bar_count):
-        print(f"Bar {idx}: Price={app.bars[idx]}, Signal={signal}")
-    return signals
+        price_now = app.bars[idx]
+        price_next = app.bars[idx+1] if idx+1 < len(app.bars) else None
+        # Determine correct decision: buy if price goes up, sell if price goes down, else none
+        if price_next is not None:
+            if price_next > price_now:
+                correct = 'buy'
+            elif price_next < price_now:
+                correct = 'sell'
+            else:
+                correct = None
+        else:
+            correct = None
+        print(f"Bar {idx}: Price={price_now}, Signal={signal}, Correct={correct}")
+    fitness = calculate_fitness(signals, app.bars, bar_count)
+    print(f"\n--- Fitness Score ---\n{fitness:.4f}")
+    return signals, fitness
+    
+def calculate_fitness(signals, prices, lookback):
+    """
+    Simple fitness function: calculates cumulative returns from signals.
+    Assumes buy/sell at next bar's close, ignores slippage/fees.
+    Returns total return as fitness score.
+    """
+    returns = []
+    for i, signal in enumerate(signals):
+        idx = i + lookback
+        if idx + 1 >= len(prices):
+            break
+        if signal == 'buy':
+            ret = (prices[idx + 1] - prices[idx]) / prices[idx]
+            returns.append(ret)
+        elif signal == 'sell':
+            ret = (prices[idx] - prices[idx + 1]) / prices[idx]
+            returns.append(ret)
+    fitness = sum(returns)
+    return fitness
 
 
 if __name__ == "__main__":
