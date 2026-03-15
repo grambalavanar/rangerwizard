@@ -1,8 +1,12 @@
 import myIBApp
 import time
+import argparse
 
-TICKERS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
-TIMEOUT = 60         # seconds to wait for data
+def parse_args():
+    parser = argparse.ArgumentParser(description="Request Stock Prices Script")
+    parser.add_argument('--tickers', type=str, nargs='+', default=["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"], help='List of ticker symbols')
+    parser.add_argument('--timeout', type=int, default=60, help='Seconds to wait for data')
+    return parser.parse_args()
 
 def get_stock_prices(app: myIBApp, tickers: list) -> dict:    
     print(f"\nRequesting prices for: {tickers}\n")
@@ -31,8 +35,9 @@ def get_stock_prices(app: myIBApp, tickers: list) -> dict:
     return app.prices
 
 if __name__ == "__main__":
+    args = parse_args()
     app = myIBApp.connect_to_tws()
-    prices = get_stock_prices(app, TICKERS)
+    prices = get_stock_prices(app, args.tickers)
     print(f"\n--- Final Prices ---\n{prices}")
     myIBApp.disconnect_tws()
 

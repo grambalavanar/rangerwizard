@@ -1,16 +1,19 @@
+import argparse
 # --- Configuration ---
-TICKER = "AAPL"
-TIMEOUT = 60  # seconds to wait for data
-BAR_COUNT = 20  # Number of bars for moving average
 
-# --- Historical Data Request Parameters ---
-DURATION_STR = "1 D"      # durationStr: 1 day
-BAR_SIZE_SETTING = "1 min" # barSizeSetting
-WHAT_TO_SHOW = "TRADES"   # whatToShow
-USE_RTH = 1                # useRTH: 1 = regular trading hours
-FORMAT_DATE = 1            # formatDate: 1 = yyyyMMdd HH:mm:ss
-KEEP_UP_TO_DATE = False    # keepUpToDate
-EXTRA_PARAMS = []          # extra parameters
+def parse_args():
+    parser = argparse.ArgumentParser(description="Moving Average Script")
+    parser.add_argument('--ticker', type=str, default="AAPL", help='Ticker symbol')
+    parser.add_argument('--timeout', type=int, default=60, help='Seconds to wait for data')
+    parser.add_argument('--bar_count', type=int, default=20, help='Number of bars for moving average')
+    parser.add_argument('--duration_str', type=str, default="1 D", help='Duration string for historical data')
+    parser.add_argument('--bar_size_setting', type=str, default="1 min", help='Bar size setting')
+    parser.add_argument('--what_to_show', type=str, default="TRADES", help='What to show')
+    parser.add_argument('--use_rth', type=int, default=1, help='Use regular trading hours')
+    parser.add_argument('--format_date', type=int, default=1, help='Format date')
+    parser.add_argument('--keep_up_to_date', type=bool, default=False, help='Keep up to date')
+    parser.add_argument('--extra_params', type=str, nargs='*', default=[], help='Extra parameters')
+    return parser.parse_args()
 
 import myIBApp
 import time
@@ -82,6 +85,19 @@ def get_moving_average(
     return moving_avg
 
 if __name__ == "__main__":
+    args = parse_args()
     app = myIBApp.connect_to_tws()
-    get_moving_average(app)
+    get_moving_average(
+        app,
+        ticker=args.ticker,
+        timeout=args.timeout,
+        bar_count=args.bar_count,
+        duration_str=args.duration_str,
+        bar_size_setting=args.bar_size_setting,
+        what_to_show=args.what_to_show,
+        use_rth=args.use_rth,
+        format_date=args.format_date,
+        keep_up_to_date=args.keep_up_to_date,
+        extra_params=args.extra_params
+    )
     myIBApp.disconnect_tws()
