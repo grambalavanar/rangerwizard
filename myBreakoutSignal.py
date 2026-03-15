@@ -29,23 +29,93 @@ def parse_args():
     parser.add_argument('--extra_params', type=str, nargs='*', default=[], help='Extra parameters')
     return parser.parse_args()
 
-def breakout_signal(prices, lookback=BAR_COUNT):
+def calculate_atr(prices, lookback=14):
     """
-    Generates breakout signals.
+    Calculate Average True Range for volatility.
+    """
+    if len(prices) < lookback + 1:
+        return 0
+    true_ranges = []
+    for i in range(1, len(prices)):
+        tr = prices[i-1] - prices[i]
+        true_ranges.append(abs(tr))
+    atr = sum(true_ranges[-lookback:]) / lookback
+    return atr
+
+def calculate_sma(prices, lookback):
+    """
+    Calculate Simple Moving Average.
+    """
+    if len(prices) < lookback:
+        return None
+    return sum(prices[-lookback:]) / lookback
+
+def breakout_signal(prices, lookback=BAR_COUNT, use_trend_filter=True, consecutive=1, use_atr=True):
+    """
+    Generates enhanced breakout signals.
     Buy: price breaks above highest high of lookback period.
     Sell: price breaks below lowest low of lookback period.
+    
+    Enhancements:
+    - use_trend_filter: Require price above/below SMA for confirmation
+    - consecutive: Number of consecutive bars required for signal
+    - use_atr: Scale breakout levels by ATR volatility
+    
     Returns: list of signals ('buy', 'sell', or None)
     """
     signals = []
+    sma_lookback = min(20, lookback // 2)  # SMA period for trend
+    
     for i in range(lookback, len(prices)):
         high = max(prices[i-lookback:i])
         low = min(prices[i-lookback:i])
-        if prices[i] > high:
+        current_price = prices[i]
+        
+        # ATR-based scaling
+        if use_atr:
+            atr = calculate_atr(prices[:i+1])
+            high = high - (atr * 0.5)  # Reduce breakout threshold
+            low = low + (atr * 0.5)
+        
+        # Check breakout
+        buy_breakout = current_price > high
+        sell_breakout = current_price < low
+        
+        # Trend filter: check if price is above/below SMA
+        sma = calculate_sma(prices[:i+1], sma_lookback)
+        trend_ok = True
+        if use_trend_filter and sma is not None:
+            if buy_breakout and current_price < sma:
+                trend_ok = False
+            elif sell_breakout and current_price > sma:
+                trend_ok = False
+        
+        # Consecutive bar confirmation
+        if consecutive > 1:
+            consecutive_count = 0
+            for j in range(max(i-consecutive+1, lookback), i+1):
+                test_high = max(prices[j-lookback:j])
+                test_low = min(prices[j-lookback:j])
+                if use_atr:
+                    test_atr = calculate_atr(prices[:j+1])
+                    test_high -= (test_atr * 0.5)
+                    test_low += (test_atr * 0.5)
+                if buy_breakout and prices[j] > test_high:
+                    consecutive_count += 1
+                elif sell_breakout and prices[j] < test_low:
+                    consecutive_count += 1
+            if consecutive_count < consecutive:
+                buy_breakout = False
+                sell_breakout = False
+        
+        # Generate signal
+        if buy_breakout and trend_ok:
             signals.append('buy')
-        elif prices[i] < low:
+        elif sell_breakout and trend_ok:
             signals.append('sell')
         else:
             signals.append(None)
+    
     return signals
 
 def get_breakout_signals(
@@ -109,7 +179,7 @@ def get_breakout_signals(
         print("Not enough bars received.")
         return None
 
-    signals = breakout_signal(app.bars, lookback=bar_count)
+    signals = breakout_signal(app.bars, lookback=bar_count, use_trend_filter=True, consecutive=1, use_atr=True)
     print(f"\n--- Breakout Signals for {ticker} ---")
     for idx, signal in enumerate(signals, start=bar_count):
         print(f"Bar {idx}: Price={app.bars[idx]}, Signal={signal}")

@@ -2,10 +2,14 @@ import myIBApp
 import time
 import argparse
 
+# --- Constants ---
+TICKERS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
+TIMEOUT = 60
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Request Stock Prices Script")
-    parser.add_argument('--tickers', type=str, nargs='+', default=["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"], help='List of ticker symbols')
-    parser.add_argument('--timeout', type=int, default=60, help='Seconds to wait for data')
+    parser.add_argument('--tickers', type=str, nargs='+', help='List of ticker symbols')
+    parser.add_argument('--timeout', type=int, help='Seconds to wait for data')
     return parser.parse_args()
 
 def get_stock_prices(app: myIBApp, tickers: list) -> dict:    
@@ -23,7 +27,7 @@ def get_stock_prices(app: myIBApp, tickers: list) -> dict:
         app.reqMktData(req_id, contract, "", True, False, [])
 
     # Wait until all data is received or timeout
-    deadline = time.time() + TIMEOUT
+    deadline = time.time() + timeout
     while time.time() < deadline:
         with app._lock:
             all_done = all(app.data_received.get(i + 1, False) for i in range(len(tickers)))
@@ -36,8 +40,10 @@ def get_stock_prices(app: myIBApp, tickers: list) -> dict:
 
 if __name__ == "__main__":
     args = parse_args()
+    tickers = args.tickers if args.tickers is not None else TICKERS
+    timeout = args.timeout if args.timeout is not None else TIMEOUT
     app = myIBApp.connect_to_tws()
-    prices = get_stock_prices(app, args.tickers)
+    prices = get_stock_prices(app, tickers, timeout)
     print(f"\n--- Final Prices ---\n{prices}")
     myIBApp.disconnect_tws()
 

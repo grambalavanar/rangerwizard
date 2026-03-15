@@ -4,11 +4,11 @@ import time
 import argparse
 
 # --- Constants ---
-TICKER = "V"
+TICKER = "XOM"
 BAR_COUNT = 1
 TIMEOUT = 60
-DURATION_STR = "1 Y"
-BAR_SIZE_SETTING = "1 W"
+DURATION_STR = "1 D"
+BAR_SIZE_SETTING = "15 mins"
 WHAT_TO_SHOW = "TRADES"
 USE_RTH = 1
 FORMAT_DATE = 1
@@ -27,6 +27,9 @@ def parse_args():
     parser.add_argument('--format_date', type=int, help='Format date')
     parser.add_argument('--keep_up_to_date', type=bool, help='Keep up to date')
     parser.add_argument('--extra_params', type=str, nargs='*', help='Extra parameters')
+    parser.add_argument('--use_trend_filter', type=int, default=1, help='Use moving average trend filter')
+    parser.add_argument('--consecutive', type=int, default=1, help='Consecutive bars for confirmation')
+    parser.add_argument('--use_atr', type=int, default=1, help='Use ATR-based volatility scaling')
     return parser.parse_args()
 
 
@@ -41,7 +44,10 @@ def run_backtest(
     format_date=FORMAT_DATE,
     keep_up_to_date=KEEP_UP_TO_DATE,
     extra_params=EXTRA_PARAMS,
-    timeout=TIMEOUT
+    timeout=TIMEOUT,
+    use_trend_filter=True,
+    consecutive=1,
+    use_atr=True
 ):
     print(f"\nBacktesting breakout logic for: {ticker}\n")
     req_id = 99
@@ -89,7 +95,10 @@ def run_backtest(
 
     signals = myBreakoutSignal.breakout_signal(
         app.bars,
-        lookback=bar_count
+        lookback=bar_count,
+        use_trend_filter=use_trend_filter,
+        consecutive=consecutive,
+        use_atr=use_atr
     )
     print(f"\n--- Backtest Results for {ticker} ---")
     for idx, signal in enumerate(signals, start=bar_count):
@@ -121,14 +130,31 @@ def calculate_fitness(signals, prices, lookback):
         idx = i + lookback
         if idx + 1 >= len(prices):
             break
+        # Avoid division by zero for price calculations
+        if prices[idx] == 0:
+            continue
         if signal == 'buy':
             ret = (prices[idx + 1] - prices[idx]) / prices[idx]
             returns.append(ret)
         elif signal == 'sell':
             ret = (prices[idx] - prices[idx + 1]) / prices[idx]
             returns.append(ret)
-    fitness = sum(returns)
-    return fitness
+    total_return = sum(returns)
+    # Normalization: map total_return to [0, 1] based on min/max observed in this run
+    # If all returns are zero, fitness is 0.5
+    if not returns:
+        return 0.5
+    min_ret = min(returns)
+    max_ret = max(returns)
+    # Avoid division by zero
+    if max_ret == min_ret or len(returns) == 0:
+        return 0.5
+    try:
+        normalized = (total_return - min_ret * len(returns)) / ((max_ret - min_ret) * len(returns))
+        normalized = max(0.0, min(1.0, normalized))
+        return normalized
+    except Exception:
+        return 0.5
 
 
 if __name__ == "__main__":
@@ -145,6 +171,9 @@ if __name__ == "__main__":
         format_date=args.format_date if args.format_date is not None else FORMAT_DATE,
         keep_up_to_date=args.keep_up_to_date if args.keep_up_to_date is not None else KEEP_UP_TO_DATE,
         extra_params=args.extra_params if args.extra_params is not None else EXTRA_PARAMS,
-        timeout=args.timeout if args.timeout is not None else TIMEOUT
+        timeout=args.timeout if args.timeout is not None else TIMEOUT,
+        use_trend_filter=bool(args.use_trend_filter) if args.use_trend_filter is not None else True,
+        consecutive=args.consecutive if args.consecutive is not None else 1,
+        use_atr=bool(args.use_atr) if args.use_atr is not None else True
     )
     myIBApp.disconnect_tws()
