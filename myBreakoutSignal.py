@@ -3,11 +3,11 @@ import time
 import argparse
 
 # --- Constants ---
-TICKER = "V"
-BAR_COUNT = 100
+TICKER = "msft" #["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
+BAR_COUNT = 30
 TIMEOUT = 60
-DURATION_STR = "1 Y"
-BAR_SIZE_SETTING = "1 W"
+DURATION_STR = "1 W"
+BAR_SIZE_SETTING = "30 mins"
 WHAT_TO_SHOW = "TRADES"
 USE_RTH = 1
 FORMAT_DATE = 1
@@ -17,16 +17,16 @@ EXTRA_PARAMS = []
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Breakout Signal Script")
-    parser.add_argument('--ticker', type=str, default="V", help='Ticker symbol')
-    parser.add_argument('--bar_count', type=int, default=20, help='Lookback period for breakout')
-    parser.add_argument('--timeout', type=int, default=60, help='Seconds to wait for data')
-    parser.add_argument('--duration_str', type=str, default="1 Y", help='Duration string for historical data')
-    parser.add_argument('--bar_size_setting', type=str, default="1 W", help='Bar size setting')
-    parser.add_argument('--what_to_show', type=str, default="TRADES", help='What to show')
-    parser.add_argument('--use_rth', type=int, default=1, help='Use regular trading hours')
-    parser.add_argument('--format_date', type=int, default=1, help='Format date')
-    parser.add_argument('--keep_up_to_date', type=bool, default=False, help='Keep up to date')
-    parser.add_argument('--extra_params', type=str, nargs='*', default=[], help='Extra parameters')
+    parser.add_argument('--ticker', type=str, default=TICKER, help='Ticker symbol')
+    parser.add_argument('--bar_count', type=int, default=BAR_COUNT, help='Lookback period for breakout')
+    parser.add_argument('--timeout', type=int, default=TIMEOUT, help='Seconds to wait for data')
+    parser.add_argument('--duration_str', type=str, default=DURATION_STR, help='Duration string for historical data')
+    parser.add_argument('--bar_size_setting', type=str, default=BAR_SIZE_SETTING, help='Bar size setting')
+    parser.add_argument('--what_to_show', type=str, default=WHAT_TO_SHOW, help='What to show')
+    parser.add_argument('--use_rth', type=int, default=USE_RTH, help='Use regular trading hours')
+    parser.add_argument('--format_date', type=int, default=FORMAT_DATE, help='Format date')
+    parser.add_argument('--keep_up_to_date', type=bool, default=KEEP_UP_TO_DATE, help='Keep up to date')
+    parser.add_argument('--extra_params', type=str, nargs='*', default=EXTRA_PARAMS, help='Extra parameters')
     return parser.parse_args()
 
 def calculate_atr(prices, lookback=14):
@@ -50,7 +50,7 @@ def calculate_sma(prices, lookback):
         return None
     return sum(prices[-lookback:]) / lookback
 
-def breakout_signal(prices, lookback=BAR_COUNT, use_trend_filter=True, consecutive=1, use_atr=True):
+def breakout_signal(prices, lookback=BAR_COUNT, use_trend_filter=True, consecutive=2, use_atr=True):
     """
     Generates enhanced breakout signals.
     Buy: price breaks above highest high of lookback period.
