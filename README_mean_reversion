@@ -1,0 +1,29 @@
+. How the Code Maps to the Strategy Steps
+Step from pseudocode	Where it lives
+Data acquisition	StrategyApp.fetch_historical + subscribe_rt_bars
+Stationarity check (ADF, Hurst, half-life)	adf_pvalue, hurst_exponent, half_life in warm_up()
+Rolling mean, std, z-score	MeanReversionStrategy._zscore
+Entry rules (±entry_z)	on_bar → _enter_long / _enter_short
+Exit rules (	z
+Stop-loss (	z
+Volatility-based sizing	_size uses rolling σ × (stop_z − entry_z)
+Execution via TWS	place_market_order (MKT DAY order)
+Graceful shutdown	SIGINT handler flattens position
+5. Important Notes Before Running
+Paper trade first. Change PORT = 7497 in myIBApp.py to use the TWS paper account; leave dry_run=True for a first pass that only logs the trades without sending them.
+Exchange routing. myIBApp.make_stock_contract hardcodes NASDAQ. SPY/QQQ route via ARCA, most NYSE names via SMART. I override it with self.contract.exchange = cfg.exchange in the strategy — use "SMART" if you're unsure.
+Bar granularity. reqRealTimeBars only supports 5-second bars. If you want to trade on 1-minute or 5-minute bars, aggregate 5-sec bars in on_bar (or poll fetch_historical on a timer for longer timeframes).
+Stationarity filter. The default requires ADF p<0.05 AND half-life in [1, 30] bars. SPY daily prices will almost always fail this (they trend). This is intentional — the "right" mean-reversion setup is usually on a spread between two cointegrated ETFs (e.g., XLF/KRE). Set require_stationary=False to trade anyway during development.
+Pairs extension. To convert to pairs trading, fetch both series, regress A on B to get β, feed spread_t = A − β·B into self.prices, and submit two simultaneous orders in _enter_long/_enter_short (buy A / short β·B, etc.).
+Commissions & slippage. The live system uses MKT orders for simplicity; for production, prefer marketable limit orders and include commission/slippage assumptions when backtesting. 
+1
+Backtest first. Do not skip an offline backtest. Wire on_bar to a historical loop (just iterate over fetch_historical output) and compute Sharpe, max drawdown, win rate before going live. 
+1
+1
+6. Quick Smoke Test
+Start TWS in paper mode, enable the API (Global Config → API → Enable ActiveX and Socket Clients), port 7497.
+Set PORT = 7497 in myIBApp.py and cfg.dry_run = True in mean_reversion.py.
+Run python mean_reversion.py.
+You should see: connection log → warm-up ADF/half-life/Hurst stats → "Subscribed to real-time bars" → z-score-driven entry/exit lines as new bars arrive.
+Once comfortable, flip dry_run=False to send real (paper) orders.
+This gives you a full end-to-end mean-reversion bot: data in, signal computed, risk sized, orders sent, positions tracked, and shutdown-safe. From here you can layer on logging-to-CSV, a proper backtest harness, and the pairs-trading variant.
