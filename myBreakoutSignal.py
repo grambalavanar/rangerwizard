@@ -6,7 +6,7 @@ import argparse
 TICKER = "XOM" #["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
 BAR_COUNT = 20
 TIMEOUT = 60
-DURATION_STR = "1 "
+DURATION_STR = "1 D"
 BAR_SIZE_SETTING = "10 mins"
 WHAT_TO_SHOW = "TRADES"
 USE_RTH = 1
@@ -234,7 +234,7 @@ if __name__ == "__main__":
         order = app.make_stop_limit_order(
             actionType="BUY",
             quantity=1,
-            stop_price=low_price,
+            stop_price=high_price,
             limit_price=high_price
         )
     else:
@@ -242,7 +242,7 @@ if __name__ == "__main__":
             actionType="SELL",
             quantity=1,
             stop_price=high_price,
-            limit_price=low_price
+            limit_price=high_price
         )
     print(order)
     app.my_place_order(contract, order)
