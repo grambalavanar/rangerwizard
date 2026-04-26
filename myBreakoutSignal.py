@@ -3,10 +3,10 @@ import time
 import argparse
 
 # --- Constants ---
-TICKER = "B" #["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
+TICKER = "XOM" #["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
 BAR_COUNT = 20
 TIMEOUT = 60
-DURATION_STR = "1 D"
+DURATION_STR = "1 "
 BAR_SIZE_SETTING = "10 mins"
 WHAT_TO_SHOW = "TRADES"
 USE_RTH = 1
@@ -228,19 +228,21 @@ if __name__ == "__main__":
 
     order = None
     contract = result["contract"]
+    low_price = round(result["low"] * 20) / 20
+    high_price = round(result["high"] * 20) / 20
     if(result["signals"].count('buy') > result["signals"].count('sell')):
         order = app.make_stop_limit_order(
             actionType="BUY",
             quantity=1,
-            stop_price=result["low"],
-            limit_price=result["high"]
+            stop_price=low_price,
+            limit_price=high_price
         )
     else:
         order = app.make_stop_limit_order(
             actionType="SELL",
             quantity=1,
-            stop_price=result["high"],
-            limit_price=result["low"]
+            stop_price=high_price,
+            limit_price=low_price
         )
     print(order)
     app.my_place_order(contract, order)

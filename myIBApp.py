@@ -26,10 +26,21 @@ class myIBApp(EWrapper, EClient):
         self.req_id_to_ticker = {}
         self.data_received = {}
         self._lock = threading.Lock()
+        self.order_filled_events = {}
 
     def log(self, method, *args):
         if LOGGING_ENABLED:
             print(f"[{method}]: {args}")
+
+    def nextValidId(self, orderId):
+        self.next_id = orderId
+        self.log("nextValidId", "next_id:", self.next_id)
+
+    def orderStatus(self, orderId, status, filled, remaining, avgFillPrice, permId, parentId, lastFillPrice, clientId, whyHeld, mktCapPrice):
+        self.log("orderStatus", "orderId:", orderId, "status:", status, "filled:", filled, "remaining:", remaining, "avgFillPrice:", avgFillPrice)
+        print(f"orderId: {orderId}, status: {status}, filled: {filled}, remaining: {remaining}, avgFillPrice: {avgFillPrice}")
+        if orderId in self.order_filled_events:
+            self.order_filled_events[orderId].set()
 
     def tickPrice(self, req_id, tick_type, price, attrib):
         """
@@ -82,6 +93,7 @@ class myIBApp(EWrapper, EClient):
 
     def make_market_order(self, actionType: str, quantity: int):
         order = Order()
+        order.eTradeOnly = False
         order.action = actionType
         order.orderType = "MKT"
         order.totalQuantity = quantity
@@ -89,6 +101,8 @@ class myIBApp(EWrapper, EClient):
 
     def make_stop_limit_order(self, actionType: str, quantity: int, stop_price: float, limit_price: float):
         order = Order()
+        order.eTradeOnly = False
+        order.firmQuoteOnly = False
         order.action = actionType
         order.orderType = "STP LMT"
         order.totalQuantity = quantity
@@ -98,7 +112,10 @@ class myIBApp(EWrapper, EClient):
 
 
     def my_place_order(self, contract: Contract, order: Order):
-        self.placeOrder(self.nextOrderId(), contract, order)
+        self.next_id = self.next_id + 1
+        order_filled_event = threading.Event()
+        self.placeOrder(self.next_id, contract, order)
+        order_filled_event.wait()
 
 def connect_to_tws():
     global _singleton_app, _api_thread
