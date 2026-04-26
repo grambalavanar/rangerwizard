@@ -3,11 +3,11 @@ import time
 import argparse
 
 # --- Constants ---
-TICKER = "msft" #["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
-BAR_COUNT = 30
+TICKER = "B" #["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
+BAR_COUNT = 20
 TIMEOUT = 60
-DURATION_STR = "1 W"
-BAR_SIZE_SETTING = "30 mins"
+DURATION_STR = "1 D"
+BAR_SIZE_SETTING = "10 mins"
 WHAT_TO_SHOW = "TRADES"
 USE_RTH = 1
 FORMAT_DATE = 1
@@ -65,6 +65,7 @@ def breakout_signal(prices, lookback=BAR_COUNT, use_trend_filter=True, consecuti
     """
     signals = []
     sma_lookback = min(20, lookback // 2)  # SMA period for trend
+    high = low = None
     
     for i in range(lookback, len(prices)):
         high = max(prices[i-lookback:i])
@@ -116,7 +117,7 @@ def breakout_signal(prices, lookback=BAR_COUNT, use_trend_filter=True, consecuti
         else:
             signals.append(None)
     
-    return signals
+    return {"signals": signals, "high": high, "low": low}
 
 def get_breakout_signals(
     app,
@@ -179,7 +180,10 @@ def get_breakout_signals(
         print("Not enough bars received.")
         return None
 
-    signals = breakout_signal(app.bars, lookback=bar_count, use_trend_filter=True, consecutive=1, use_atr=True)
+    result = breakout_signal(app.bars, lookback=bar_count, use_trend_filter=True, consecutive=1, use_atr=True)
+    signals = result["signals"]
+    high = result["high"]
+    low = result["low"]
     print(f"\n--- Breakout Signals for {ticker} ---")
     for idx, signal in enumerate(signals, start=bar_count):
         print(f"Bar {idx}: Price={app.bars[idx]}, Signal={signal}")
@@ -203,12 +207,12 @@ def get_breakout_signals(
         print(label + '|' + ''.join(row))
     print('     ' + '-' * (len(signals) * 3))
     print('     ' + ''.join([f'{i+BAR_COUNT:3}' for i in range(len(signals))]))
-    return signals
+    return {"signals": signals, "high": high, "low": low, "contract": contract}
 
 if __name__ == "__main__":
     args = parse_args()
     app = myIBApp.connect_to_tws()
-    get_breakout_signals(
+    result = get_breakout_signals(
         app,
         ticker=args.ticker if args.ticker is not None else TICKER,
         timeout=args.timeout if args.timeout is not None else TIMEOUT,
@@ -221,4 +225,23 @@ if __name__ == "__main__":
         keep_up_to_date=args.keep_up_to_date if args.keep_up_to_date is not None else KEEP_UP_TO_DATE,
         extra_params=args.extra_params if args.extra_params is not None else EXTRA_PARAMS
     )
+
+    order = None
+    contract = result["contract"]
+    if(result["signals"].count('buy') > result["signals"].count('sell')):
+        order = app.make_stop_limit_order(
+            actionType="BUY",
+            quantity=1,
+            stop_price=result["low"],
+            limit_price=result["high"]
+        )
+    else:
+        order = app.make_stop_limit_order(
+            actionType="SELL",
+            quantity=1,
+            stop_price=result["high"],
+            limit_price=result["low"]
+        )
+    print(order)
+    app.my_place_order(contract, order)
     myIBApp.disconnect_tws()

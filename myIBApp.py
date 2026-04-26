@@ -3,6 +3,7 @@ import time
 from ibapi.client import EClient
 from ibapi.wrapper import EWrapper
 from ibapi.contract import Contract
+from ibapi.order import Order
 from ibapi.ticktype import TickTypeEnum
 
 
@@ -70,14 +71,34 @@ class myIBApp(EWrapper, EClient):
         self.log("tickSnapshotEnd", "request_id:", req_id)
 
 
-    def make_stock_contract(self, symbol: str) -> Contract:
+    def make_stock_contract(self, symbol: str, sec_type = "STK", exchange = "NASDAQ", currency = "USD") -> Contract:
         contract = Contract()
         contract.symbol = symbol
-        contract.secType = "STK"
-        contract.exchange = "NASDAQ"
-        contract.currency = "USD"
+        contract.secType = sec_type
+        contract.exchange = exchange
+        contract.currency = currency
         print(f"symbol: {contract.symbol}, secType: {contract.secType}, exchange: {contract.exchange}, currency: {contract.currency}")
         return contract
+
+    def make_market_order(self, actionType: str, quantity: int):
+        order = Order()
+        order.action = actionType
+        order.orderType = "MKT"
+        order.totalQuantity = quantity
+        return order
+
+    def make_stop_limit_order(self, actionType: str, quantity: int, stop_price: float, limit_price: float):
+        order = Order()
+        order.action = actionType
+        order.orderType = "STP LMT"
+        order.totalQuantity = quantity
+        order.auxPrice = stop_price
+        order.lmtPrice = limit_price
+        return order
+
+
+    def my_place_order(self, contract: Contract, order: Order):
+        self.placeOrder(self.nextOrderId(), contract, order)
 
 def connect_to_tws():
     global _singleton_app, _api_thread
