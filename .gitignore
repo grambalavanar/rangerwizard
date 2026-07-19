@@ -1,6 +1,11 @@
+
+
 #twiapi
 twsapi_macunix/
 bin/
+
+# Genetic optimizer run outputs
+momentum/test/runs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
