@@ -7,6 +7,9 @@ bin/
 # Genetic optimizer run outputs
 momentum/test/runs/
 
+# Daily signal logs (used for strategy refinement — not committed)
+logs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
