@@ -38,7 +38,11 @@ class myIBApp(EWrapper, EClient):
 
     def orderStatus(self, orderId, status, filled, remaining, avgFillPrice, permId, parentId, lastFillPrice, clientId, whyHeld, mktCapPrice):
         self.log("orderStatus", "orderId:", orderId, "status:", status, "filled:", filled, "remaining:", remaining, "avgFillPrice:", avgFillPrice)
-        print(f"orderId: {orderId}, status: {status}, filled: {filled}, remaining: {remaining}, avgFillPrice: {avgFillPrice}")
+        # Only print on meaningful transitions — IBKR sends multiple PreSubmitted
+        # callbacks for a single order as it moves through the routing pipeline.
+        # Printing every callback causes confusing duplicate lines in the log.
+        if status in ("Filled", "Cancelled", "Inactive", "Submitted"):
+            print(f"orderId: {orderId}, status: {status}, filled: {filled}, remaining: {remaining}, avgFillPrice: {avgFillPrice}")
         if orderId in self.order_filled_events:
             self.order_filled_events[orderId].set()
 
@@ -82,7 +86,7 @@ class myIBApp(EWrapper, EClient):
         self.log("tickSnapshotEnd", "request_id:", req_id)
 
 
-    def make_stock_contract(self, symbol: str, sec_type = "STK", exchange = "NASDAQ", currency = "USD") -> Contract:
+    def make_stock_contract(self, symbol: str, sec_type = "STK", exchange = "SMART", currency = "USD") -> Contract:
         contract = Contract()
         contract.symbol = symbol
         contract.secType = sec_type
@@ -93,7 +97,8 @@ class myIBApp(EWrapper, EClient):
 
     def make_market_order(self, actionType: str, quantity: int):
         order = Order()
-        order.eTradeOnly = False
+        order.eTradeOnly = ""      # suppress deprecated default (API 10.19+)
+        order.firmQuoteOnly = ""  # suppress deprecated default (API 10.19+)
         order.action = actionType
         order.orderType = "MKT"
         order.totalQuantity = quantity
@@ -101,8 +106,8 @@ class myIBApp(EWrapper, EClient):
 
     def make_stop_limit_order(self, actionType: str, quantity: int, stop_price: float, limit_price: float):
         order = Order()
-        order.eTradeOnly = False
-        order.firmQuoteOnly = False
+        order.eTradeOnly = ""      # suppress deprecated default (API 10.19+)
+        order.firmQuoteOnly = ""  # suppress deprecated default (API 10.19+)
         order.action = actionType
         order.orderType = "STP LMT"
         order.totalQuantity = quantity

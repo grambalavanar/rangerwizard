@@ -87,7 +87,7 @@ UNIVERSES: Dict[str, List[str]] = {
     "volume":  ["SPY", "QQQ", "AAPL", "TSLA", "NVDA", "AMZN", "AMD", "SOXL", "BAC", "F"],
 }
 UNIVERSES["all"] = sorted(set(s for v in UNIVERSES.values() for s in v))
-DEFAULT_SYMBOLS = ["NFLX"]
+DEFAULT_SYMBOLS = ["AMD"]
 
 
 # ============================================================
@@ -571,6 +571,7 @@ def fetch_current_price(app: myIBApp, symbol: str, timeout: int = 10) -> float:
 
     _orig     = getattr(app, "tickPrice",      None)
     _orig_end = getattr(app, "tickSnapshotEnd", None)
+    _orig_err = getattr(app, "error",           None)
 
     def _tick(rid, tick_type, price, attrib):
         if rid == req_id and tick_type in (2, 4) and price > 0:
@@ -585,11 +586,22 @@ def fetch_current_price(app: myIBApp, symbol: str, timeout: int = 10) -> float:
         if _orig_end:
             _orig_end(rid)
 
+    def _err(rid, code, msg, *a):
+        # Suppress error 300 "Can't find EId" for snapshot requests —
+        # snapshot mode auto-cancels; the cancel-on-end call is redundant.
+        if rid == req_id and code == 300:
+            return
+        if _orig_err:
+            _orig_err(rid, code, msg, *a)
+
     app.tickPrice       = _tick
     app.tickSnapshotEnd = _snap_end
+    app.error           = _err
     try:
         contract = app.make_stock_contract(symbol)
         app.req_id_to_ticker[req_id] = symbol
+        # snapshot=True: IBKR auto-cancels after tickSnapshotEnd — do NOT
+        # call cancelMktData afterward or IBKR will return error 300.
         app.reqMktData(req_id, contract, "", True, False, [])
         done.wait(timeout=timeout)
     finally:
@@ -597,10 +609,8 @@ def fetch_current_price(app: myIBApp, symbol: str, timeout: int = 10) -> float:
             app.tickPrice = _orig
         if _orig_end is not None:
             app.tickSnapshotEnd = _orig_end
-        try:
-            app.cancelMktData(req_id)
-        except Exception:
-            pass
+        if _orig_err is not None:
+            app.error = _orig_err
 
     price = float(holder[-1]) if holder else 0.0
     if price == 0.0:
@@ -1086,13 +1096,20 @@ def main() -> None:
                 log.info(f"{symbol}: composite={composite:.3f}  signal={signal}"
                          f"  ({'LONG' if signal == 1 else 'FLAT'})")
 
+                # Use last historical close for sizing — avoids requiring a
+                # real-time market data subscription (error 10089).
+                # The market order still executes at the live price; we only
+                # use this for share-count calculation.
+                last_close = float(df["Close"].iloc[-1])
+                log.debug(f"{symbol}: last close ${last_close:.2f} (used for sizing)")
+
                 # Determine action
                 current_qty = positions.get(symbol, (0, 0.0))[0]
                 action      = determine_action(symbol, signal, current_qty)
                 log.info(f"{symbol}: held={current_qty}  action={action}")
 
                 if action == "BUY":
-                    price = fetch_current_price(app, symbol)
+                    price = last_close
                     qty   = calculate_position_size(nlv, price, args.risk_pct)
                     log.info(f"{symbol}: BUY {qty} shares @ ~${price:.2f} "
                              f"= ${qty * price:,.0f}")
@@ -1102,9 +1119,11 @@ def main() -> None:
                         log_trade(today, symbol, "BUY", qty, price, order_id, nlv)
 
                 elif action == "SELL":
-                    price    = fetch_current_price(app, symbol)
-                    qty      = current_qty
-                    log.info(f"{symbol}: SELL {qty} shares @ ~${price:.2f}")
+                    price     = last_close
+                    max_qty   = calculate_position_size(nlv, price, args.risk_pct)
+                    qty       = min(current_qty, max_qty)
+                    log.info(f"{symbol}: SELL {qty} of {current_qty} shares @ ~${price:.2f} "
+                             f"(capped at 1% NLV = {max_qty} shares)")
                     order_id = place_order(app, symbol, "SELL", qty,
                                            dry_run=args.dry_run)
                     if order_id is not None:
