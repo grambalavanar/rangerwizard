@@ -41,12 +41,14 @@ UNIVERSES = {
 UNIVERSES["all"] = sorted(set(s for v in UNIVERSES.values() for s in v))
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--symbol",   default=None,  help="Single ticker")
-parser.add_argument("--symbols",  nargs="+",     help="Multiple tickers for comparison")
-parser.add_argument("--universe", default=None,
+parser.add_argument("--symbol",      default=None,  help="Single ticker")
+parser.add_argument("--symbols",     nargs="+",     help="Multiple tickers for comparison")
+parser.add_argument("--universe",    default=None,
                     choices=["megacap", "movers", "volume", "all"],
                     help="Pre-defined universe")
-parser.add_argument("--years",    default=3, type=int)
+parser.add_argument("--years",       default=3, type=int)
+parser.add_argument("--params-file", default=PARAMS_FILE,
+                    help="Path to optimizer JSON (default: alpha_composite_opt.json)")
 args = parser.parse_args()
 
 # ── Resolve symbol list ───────────────────────────────────────────────────────
@@ -60,7 +62,7 @@ else:
     symbols = ["AAPL"]
 
 # ── Load optimised parameters ────────────────────────────────────────────────
-with open(PARAMS_FILE) as f:
+with open(args.params_file) as f:
     data = json.load(f)
 
 best_params = data["best_params"]

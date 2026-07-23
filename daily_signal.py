@@ -84,7 +84,7 @@ HISTORY_BARS = "1 Y"    # IBKR historical data duration for signal computation
 UNIVERSES: Dict[str, List[str]] = {
     "megacap": ["AAPL", "NVDA", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "AVGO", "LLY", "BRK-B"],
     "movers":  ["TSLA", "NVDA", "AMD", "PLTR", "MSTR", "SMCI", "COIN", "MRNA", "SHOP", "CELH"],
-    "volume":  ["SPY", "QQQ", "AAPL", "TSLA", "NVDA", "AMZN", "AMD", "SOXL", "BAC", "F"],
+    "volume":  ["SPY", "QQQ", "AAPL", "TSLA", "NVDA", "AMZN", "AMD", "SOXL", "BAC"],
 }
 UNIVERSES["all"] = sorted(set(s for v in UNIVERSES.values() for s in v))
 DEFAULT_SYMBOLS = ["AMD"]

@@ -183,7 +183,18 @@ DEFAULT_PARAMS: dict = {
     "atr_stop_mult":   2.5,   # Stop distance = atr_stop_mult × ATR below highest close
     "use_trailing_stop": True,
 
-    # ── Component Weights (must sum to 1.0) ───────────────────────
+    # ── Bollinger Band %B (Component 10) ───────────────────────────
+    "bb_window":    20,   # Bollinger Band period
+    "bb_std":      2.0,   # Standard deviation multiplier
+
+    # ── Money Flow Index (Component 11) ─────────────────────────
+    "mfi_window":   14,   # MFI lookback (same as RSI default)
+    "mfi_low":    50.0,   # MFI momentum zone lower bound
+    "mfi_high":   75.0,   # MFI momentum zone upper bound (not overbought)
+
+    # ── Component Weights (auto-normalised — do NOT need to sum to 1.0) ─
+    # The GA can tune these as raw influence scores; they are normalised
+    # inside _compute_composite so any positive values are valid.
     "w_trend":     0.20,  # Weinstein stage filter (most important gate)
     "w_tsmom":     0.18,  # TSMOM (primary momentum signal)
     "w_lintrend":  0.15,  # Linear trend regression (best academic signal)
@@ -193,6 +204,8 @@ DEFAULT_PARAMS: dict = {
     "w_kst":       0.07,  # KST cycle oscillator
     "w_volume":    0.07,  # Volume confirmation (OBV)
     "w_ichimoku":  0.05,  # Ichimoku cloud
+    "w_bollinger": 0.07,  # Bollinger Band %B
+    "w_mfi":       0.07,  # Money Flow Index
     # Volatility regime is applied as a multiplicative damper, not additive weight
 }
 
@@ -798,6 +811,121 @@ class AlphaCompositeMomentumStrategy(Strategy):
 
         return (0.60 * obv_bull + 0.40 * vol_ratio).fillna(0.5)
 
+    # ── Sub-score 10: Bollinger Band %B ──────────────────────────────────────
+
+    def _score_bollinger(self, df: pd.DataFrame, p: dict) -> pd.Series:
+        """
+        Bollinger Band %B position score.
+        -----------------------------------
+        Metric
+            %B = (Close - Lower Band) / (Upper - Lower), range [0, 1].
+            Shows where price sits within its volatility envelope:
+              0 = at the lower band (oversold / extreme), 0.5 = at the
+              midline (20-day SMA), 1 = at the upper band (overbought).
+
+        Research basis
+            John Bollinger (1983), "Bollinger on Bollinger Bands" (2002).
+            %B above 0.5 confirms the close is above the 20-day mean —
+            a prerequisite for momentum. %B between 0.5–0.85 is the
+            "momentum sweet spot": above the midline but not yet at an
+            extreme that warns of reversal. This range was validated by
+            Bollinger himself as the bull trend trading zone.
+
+        Used by
+            Confirms that price momentum is occurring within a healthy
+            volatility context (weight 0.07). Pairs well with RSI zone:
+            high RSI + high %B = confirmed breakout; low RSI + low %B
+            = potential mean-reversion opportunity.
+
+        When you need this
+            Low Bollinger score despite high TSMOM/linear-trend scores =
+            price may be at the lower band of a volatile range —
+            consider waiting for %B to cross above 0.5 before entering.
+
+        Interpretation
+            1.0 = price at ideal momentum position (~70% of band width)
+            0.5 = price at midline or at extremes
+            0.0 = price well below the midline
+
+        Args:
+            df (pd.DataFrame): OHLCV data.
+            p  (dict):         Parameter dict.
+
+        Returns:
+            pd.Series: Score in [0, 1].
+        """
+        mid   = sma(df["Close"], p["bb_window"])
+        std_r = df["Close"].rolling(p["bb_window"]).std()
+        upper = mid + p["bb_std"] * std_r
+        lower = mid - p["bb_std"] * std_r
+        pct_b = ((df["Close"] - lower) / (upper - lower).replace(0, np.nan)).clip(0, 1)
+        # Triangle function peaking at 0.70 (centre of momentum zone 0.50–0.85)
+        score = (1.0 - (pct_b - 0.70).abs() / 0.70).clip(0, 1)
+        return score.fillna(0.5)
+
+    # ── Sub-score 11: Money Flow Index ────────────────────────────────────────
+
+    def _score_mfi(self, df: pd.DataFrame, p: dict) -> pd.Series:
+        """
+        Money Flow Index (MFI) momentum zone score.
+        ---------------------------------------------
+        Metric
+            MFI is a volume-weighted RSI (0–100). It incorporates both
+            price direction and volume magnitude, making it more sensitive
+            to institutional buying/selling than RSI alone.
+            MFI = 100 - 100 / (1 + positive_money_flow / negative_money_flow)
+            where money_flow = typical_price × volume.
+
+        Research basis
+            Achelis (2001) "Technical Analysis from A to Z" documents MFI
+            as superior to RSI for detecting accumulation/distribution.
+            Validated in studies on volume-price momentum: combining volume
+            with price momentum reduces false signals in choppy markets.
+            The zone-based scoring (50–75) mirrors the RSI momentum zone
+            (Cardwell 1994): in uptrends the MFI oscillates 50–90, with
+            the 50–75 range indicating trend continuation without exhaustion.
+
+        Used by
+            Volume-augmented momentum confirmation (weight 0.07). The MFI
+            provides a second, independent volume signal alongside OBV.
+            When both MFI and OBV are bullish, the volume confirmation
+            is strongest.
+
+        When you need this
+            MFI below 50 during an apparent price uptrend = volume is not
+            supporting the move (potential false breakout). MFI above 80
+            = possible overbought on volume basis. Both are reasons to
+            reduce conviction in an otherwise strong composite signal.
+
+        Interpretation
+            1.0 = MFI in ideal zone [mfi_low, mfi_high] (default 50–75)
+            0.5 = MFI at zone edge or neutral
+            0.0 = MFI oversold (<30) or overbought (>80)
+
+        Args:
+            df (pd.DataFrame): OHLCV data.
+            p  (dict):         Parameter dict.
+
+        Returns:
+            pd.Series: Score in [0, 1].
+        """
+        typical = (df["High"] + df["Low"] + df["Close"]) / 3
+        mf      = typical * df["Volume"]
+        tp_diff = typical.diff()
+
+        pos_mf = mf.where(tp_diff > 0, 0.0).rolling(p["mfi_window"]).sum()
+        neg_mf = mf.where(tp_diff < 0, 0.0).abs().rolling(p["mfi_window"]).sum()
+        mfi_vals = 100 - (100 / (1 + pos_mf / neg_mf.replace(0, np.nan)))
+
+        lo, hi = p["mfi_low"], p["mfi_high"]
+        mid_mfi = (lo + hi) / 2
+        zone = mfi_vals.apply(
+            lambda m: (1.0 if lo <= m <= hi
+                       else max(0.0, 1.0 - abs(m - mid_mfi) / mid_mfi * 2))
+            if not np.isnan(m) else 0.5
+        )
+        return zone.fillna(0.5)
+
     # ── Sub-score 9: Ichimoku Cloud ───────────────────────────────────────────
 
     def _score_ichimoku(self, df: pd.DataFrame, p: dict) -> pd.Series:
@@ -994,26 +1122,32 @@ class AlphaCompositeMomentumStrategy(Strategy):
         Returns:
             pd.Series: Composite score in [0, 1], NaN filled with 0.
         """
-        s1 = self._score_trend_stage(df, p)
-        s2 = self._score_tsmom(df, p)
-        s3 = self._score_linear_trend(df, p)
-        s4 = self._score_52high(df, p)
-        s5 = self._score_macd_quality(df, p)
-        s6 = self._score_rsi_zone(df, p)
-        s7 = self._score_kst(df, p)
-        s8 = self._score_volume(df, p)
-        s9 = self._score_ichimoku(df, p)
+        s1  = self._score_trend_stage(df, p)
+        s2  = self._score_tsmom(df, p)
+        s3  = self._score_linear_trend(df, p)
+        s4  = self._score_52high(df, p)
+        s5  = self._score_macd_quality(df, p)
+        s6  = self._score_rsi_zone(df, p)
+        s7  = self._score_kst(df, p)
+        s8  = self._score_volume(df, p)
+        s9  = self._score_ichimoku(df, p)
+        s10 = self._score_bollinger(df, p)
+        s11 = self._score_mfi(df, p)
+
+        # Auto-normalise weights so the GA can tune raw influence values
+        # without needing a sum-to-1 constraint.
+        raw_w = np.array([
+            p["w_trend"], p["w_tsmom"], p["w_lintrend"], p["w_52high"],
+            p["w_macd"],  p["w_rsi"],   p["w_kst"],      p["w_volume"],
+            p["w_ichimoku"], p["w_bollinger"], p["w_mfi"],
+        ], dtype=float)
+        raw_w = np.clip(raw_w, 1e-6, None)      # guard against zero/negative
+        w = raw_w / raw_w.sum()                 # normalise to sum = 1.0
 
         composite = (
-            p["w_trend"]    * s1 +
-            p["w_tsmom"]    * s2 +
-            p["w_lintrend"] * s3 +
-            p["w_52high"]   * s4 +
-            p["w_macd"]     * s5 +
-            p["w_rsi"]      * s6 +
-            p["w_kst"]      * s7 +
-            p["w_volume"]   * s8 +
-            p["w_ichimoku"] * s9
+            w[0]  * s1  + w[1]  * s2  + w[2]  * s3  + w[3]  * s4  +
+            w[4]  * s5  + w[5]  * s6  + w[6]  * s7  + w[7]  * s8  +
+            w[8]  * s9  + w[9]  * s10 + w[10] * s11
         )
 
         # Apply volatility regime damper (Daniel & Moskowitz crash protection)
@@ -1123,6 +1257,21 @@ try:
 
             # ATR trailing stop
             "atr_stop_mult":   FloatParam(1.5, 4.0),
+
+            # Component weights (raw influence scores — auto-normalised to sum=1
+            # inside _compute_composite, so no constraint required here).
+            # The GA discovers which components matter most for a given basket.
+            "w_trend":         FloatParam(0.05, 0.40),
+            "w_tsmom":         FloatParam(0.05, 0.40),
+            "w_lintrend":      FloatParam(0.05, 0.35),
+            "w_52high":        FloatParam(0.02, 0.25),
+            "w_macd":          FloatParam(0.02, 0.25),
+            "w_rsi":           FloatParam(0.02, 0.20),
+            "w_kst":           FloatParam(0.01, 0.20),
+            "w_volume":        FloatParam(0.01, 0.20),
+            "w_ichimoku":      FloatParam(0.01, 0.20),
+            "w_bollinger":     FloatParam(0.01, 0.20),
+            "w_mfi":           FloatParam(0.01, 0.20),
         },
         constraints=[
             lambda p: p["sma_short"] < p["sma_long"],
@@ -1135,10 +1284,12 @@ try:
     Pre-built ParameterSpace for genetic optimisation.
     ---------------------------------------------------
     What it is
-        A ready-to-use ``ParameterSpace`` that defines the 14 highest-impact
-        tunable parameters of ``AlphaCompositeMomentumStrategy``. Includes
-        four constraints to ensure parameter validity (SMA ordering, MACD
-        window ordering, RSI bound ordering, threshold ordering).
+        A ready-to-use ``ParameterSpace`` that defines tunable parameters
+        for ``AlphaCompositeMomentumStrategy``, now including all 11
+        component weights. The weights are raw influence scores that the
+        GA normalises to sum=1 inside _compute_composite — no constraint
+        is needed on the weights themselves. The GA will discover which
+        signals matter most for the target stock basket.
 
     Used by
         Pass directly to ``GeneticOptimizer``:
