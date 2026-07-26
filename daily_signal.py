@@ -57,8 +57,9 @@ import os
 import sys
 import threading
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -91,8 +92,96 @@ DEFAULT_SYMBOLS = ["AMD"]
 
 
 # ============================================================
-# 1. SETUP
+# 0. MARKET CALENDAR HELPERS
 # ============================================================
+
+def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
+    """Return the nth occurrence of ``weekday`` (0=Mon) in the given month."""
+    first = date(year, month, 1)
+    delta = (weekday - first.weekday()) % 7
+    return first + timedelta(days=delta + 7 * (n - 1))
+
+
+def _last_weekday(year: int, month: int, weekday: int) -> date:
+    """Return the last occurrence of ``weekday`` in the given month."""
+    first_next = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    last_day = first_next - timedelta(days=1)
+    delta = (last_day.weekday() - weekday) % 7
+    return last_day - timedelta(days=delta)
+
+
+def _nearest_weekday(d: date) -> date:
+    """Observe a weekend holiday on the nearest weekday (Fri if Sat, Mon if Sun)."""
+    if d.weekday() == 5:
+        return d - timedelta(days=1)
+    if d.weekday() == 6:
+        return d + timedelta(days=1)
+    return d
+
+
+def _easter(year: int) -> date:
+    """Anonymous Gregorian algorithm for Easter Sunday."""
+    a = year % 19
+    b, c = divmod(year, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = (h + l - 7 * m + 114) % 31 + 1
+    return date(year, month, day)
+
+
+def nyse_holidays(year: int) -> frozenset:
+    """Return NYSE market holidays for ``year`` as a frozenset of date objects."""
+    hols = {
+        _nearest_weekday(date(year, 1, 1)),           # New Year's Day
+        _nth_weekday(year, 1, 0, 3),                  # MLK Jr Day (3rd Mon Jan)
+        _nth_weekday(year, 2, 0, 3),                  # Presidents Day (3rd Mon Feb)
+        _easter(year) - timedelta(days=2),             # Good Friday
+        _last_weekday(year, 5, 0),                    # Memorial Day (last Mon May)
+        _nearest_weekday(date(year, 6, 19)),           # Juneteenth
+        _nearest_weekday(date(year, 7, 4)),            # Independence Day
+        _nth_weekday(year, 9, 0, 1),                  # Labor Day (1st Mon Sep)
+        _nth_weekday(year, 11, 3, 4),                 # Thanksgiving (4th Thu Nov)
+        _nearest_weekday(date(year, 12, 25)),          # Christmas
+    }
+    return frozenset(hols)
+
+
+_ET = ZoneInfo("America/New_York")
+
+
+def _check_market_window(log: logging.Logger) -> bool:
+    """
+    Return True if the current ET time falls in the 9:30–10:15 AM window.
+    Exits early (sys.exit 0) on NYSE holidays or outside the window.
+    Called at the top of main() to guard against the "off-season" cron
+    trigger firing on the wrong UTC hour during DST transitions.
+    """
+    today_et = datetime.now(_ET).date()
+    if today_et in nyse_holidays(today_et.year):
+        log.info(f"NYSE holiday ({today_et}) — skipping run.")
+        sys.exit(0)
+
+    now_et = datetime.now(_ET)
+    market_open_min  = 9 * 60 + 30   # 9:30 AM ET
+    market_close_min = 10 * 60 + 15  # 10:15 AM ET  (window closes 45 min after open)
+    now_min = now_et.hour * 60 + now_et.minute
+    if not (market_open_min <= now_min <= market_close_min):
+        log.info(
+            f"Outside 9:30–10:15 AM ET window "
+            f"(now {now_et.strftime('%H:%M %Z')}) — skipping run."
+        )
+        sys.exit(0)
+
+    return True
+
+
+
 
 def setup_logging(today: str) -> logging.Logger:
     """
@@ -1044,6 +1133,9 @@ def main() -> None:
     log.info(f"Account : {'LIVE' if args.live else 'PAPER'}"
              f"  |  dry_run={args.dry_run}  |  risk={args.risk_pct:.2%}")
     log.info("=" * 60)
+
+    # ── Market calendar guard (holiday + DST window check) ────────────────────
+    _check_market_window(log)
 
     # ── Resolve symbols ───────────────────────────────────────────────────────
     if args.universe:

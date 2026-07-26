@@ -6,7 +6,8 @@ name: Daily Signal — Live Trading
 
 on:
   schedule:
-    - cron: "45 13 * * 1-5"   # 9:45 AM EDT (summer)
+    - cron: "45 13 * * 1-5"   # 9:45 AM EDT (Apr–Nov, UTC-4)
+    - cron: "45 14 * * 1-5"   # 9:45 AM EST (Nov–Mar, UTC-5)
   workflow_dispatch:           # also allows manual "Run workflow" button in GitHub UI
 
 jobs:
@@ -82,10 +83,10 @@ jobs:
 #        ./svc.sh start
 #   4. Verify the runner appears as "Idle" on the GitHub Runners page.
 #
-# DST clock change reminder:
-#   • Summer (EDT, 2nd Sun Mar – 1st Sun Nov): cron "45 13 * * 1-5"  ← current
-#   • Winter (EST, 1st Sun Nov – 2nd Sun Mar): cron "45 14 * * 1-5"
-#   Update the schedule above when clocks change.
+# DST clock change:
+#   Both cron lines are always active — daily_signal.py guards against running
+#   outside the 9:30–10:15 AM ET window, so the "off-season" trigger exits
+#   immediately. No manual cron edits needed when clocks change.
 #
 # Market holidays:
 #   GitHub cron does not know about NYSE holidays (e.g. July 4, Thanksgiving).
