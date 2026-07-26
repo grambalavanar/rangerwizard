@@ -1,11 +1,12 @@
 """
-strategies/tools — unified indicator library
+strategies/tools -- indicator library
 
-Re-exports everything from momentum_tools and mean_reversion_tools and
-adds the new regime_tools module.
+Exports momentum and mean-reversion indicators.
+Regime tools (GaussianHMM, RegimeClassifier, etc.) live in
+strategies.alpha_composite -- import from there to avoid circular imports.
 """
 
-from momentum.momentum_tools import (
+from strategies.tools.momentum_tools import (
     ema, sma, wma,
     rsi, stochastic_oscillator, stochrsi,
     williams_r, roc, awesome_oscillator, tsi,
@@ -18,17 +19,11 @@ from momentum.momentum_tools import (
     crossover, crossunder, atr, zscore,
 )
 
-from mean_reversion.mean_reversion_tools import (
+from strategies.tools.mean_reversion_tools import (
     price_zscore, bollinger_bands, efficiency_ratio,
     hurst_exponent, ou_halflife, variance_ratio,
     connors_rsi, rsi2, volume_climax,
     rsi_bullish_divergence, macd_bullish_divergence,
     mean_reversion_regime,
     avg_holding_period, mean_reversion_speed,
-)
-
-from strategies.tools.regime_tools import (
-    GaussianHMM, RegimeClassifier,
-    volatility_regime, trend_regime, classify_regime,
-    REGIME_MOMENTUM, REGIME_MEAN_REVERSION, REGIME_CASH,
 )

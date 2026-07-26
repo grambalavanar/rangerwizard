@@ -30,11 +30,11 @@ from typing import Tuple, Dict
 import numpy as np
 import pandas as pd
 
-_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from momentum.momentum_tools import (
+from strategies.tools.momentum_tools import (
     ema, sma, rsi, adx, atr, williams_r, cci, stochastic_oscillator,
     ultimate_oscillator, kama as _kama, zscore as _zscore,
 )
@@ -653,7 +653,7 @@ def macd_bullish_divergence(
     Returns:
         pd.Series: 1.0 = bullish MACD divergence, 0.0 = none.
     """
-    from momentum.momentum_tools import macd
+    from strategies.tools.momentum_tools import macd
     _, _, hist = macd(close, window_fast=fast, window_slow=slow, window_signal=signal_w)
     price_ll   = (close == close.rolling(window).min()).astype(float)
     hist_hl    = (hist  > hist.rolling(window).min() + 0.0001).astype(float)

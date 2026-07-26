@@ -60,7 +60,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from momentum.test.strategy_tester import (
+from strategies.test.strategy_tester import (
     MACDMomentumStrategy,
     BacktestConfig,
     BacktestResult,
@@ -251,7 +251,7 @@ def _load_ibkr(symbol: str, years: int) -> Tuple[pd.DataFrame, str]:
         RuntimeError: If TWS is not running or the symbol is not found.
     """
     from myIBApp import connect_to_tws
-    from momentum.test.strategy_tester import fetch_ibkr_history
+    from strategies.test.strategy_tester import fetch_ibkr_history
 
     print(f"  Connecting to IBKR TWS for {symbol} ({years}y) ...", end=" ", flush=True)
     app = connect_to_tws()
@@ -1131,7 +1131,7 @@ def main() -> None:
         Called automatically when you run this file as a script:
             ``python momentum/test/run_backtest_example.py``
         Also importable for use in notebooks or larger scripts:
-            ``from momentum.test.run_backtest_example import main; main()``
+            ``from strategies.test.run_backtest_example import main; main()``
 
     CLI Arguments
         --symbol TICKER    Stock ticker to test (default: AAPL)

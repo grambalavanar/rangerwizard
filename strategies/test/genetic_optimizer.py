@@ -16,11 +16,11 @@ How it works
 
 Quick example
 -------------
-    from momentum.test.genetic_optimizer import (
+    from strategies.test.genetic_optimizer import (
         GeneticOptimizer, ParameterSpace, IntParam, FloatParam, GAConfig
     )
-    from momentum.test.strategy_tester import Strategy, BacktestConfig
-    from momentum.momentum_tools import macd, adx, crossover
+    from strategies.test.strategy_tester import Strategy, BacktestConfig
+    from strategies.tools.momentum_tools import macd, adx, crossover
 
     class TunableMACD(Strategy):
         def __init__(self, params):
@@ -83,10 +83,10 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from momentum.test.strategy_tester import (
+from strategies.test.strategy_tester import (
     Strategy, BacktestConfig, BacktestResult, run_backtest,
 )
-from momentum.test.run_backtest_example import load_price_data
+from strategies.test.run_backtest_example import load_price_data
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -226,7 +226,7 @@ class ParameterSpace:
         across different stock baskets or ``GAConfig`` settings.
 
     Code example
-        >>> from momentum.test.genetic_optimizer import (
+        >>> from strategies.test.genetic_optimizer import (
         ...     ParameterSpace, IntParam, FloatParam, ChoiceParam
         ... )
         >>> space = ParameterSpace(
@@ -1577,7 +1577,7 @@ def _make_example_strategy_factory():
     Returns:
         type: The ``TunableMACDStrategy`` class (usable as a factory).
     """
-    from momentum.momentum_tools import macd, adx, crossover as _crossover
+    from strategies.tools.momentum_tools import macd, adx, crossover as _crossover
 
     class TunableMACDStrategy(Strategy):
         """

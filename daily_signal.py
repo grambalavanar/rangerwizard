@@ -69,7 +69,7 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 from myIBApp import myIBApp, connect_to_tws
-from momentum.strategies.alpha_composite import AlphaCompositeMomentumStrategy
+from strategies.alpha_composite import AlphaCompositeMomentumStrategy
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 LOG_DIR      = os.path.join(_ROOT, "logs")
@@ -179,7 +179,7 @@ def load_params(params_file: str) -> dict:
     Returns:
         dict: Parameter dict to pass to AlphaCompositeMomentumStrategy.
     """
-    from momentum.strategies.alpha_composite import DEFAULT_PARAMS
+    from strategies.alpha_composite import DEFAULT_PARAMS
 
     log = logging.getLogger("daily_signal")
     if not os.path.exists(params_file):

@@ -18,10 +18,10 @@ Usage flow
 
 Quick example
 -------------
-    from momentum.test.strategy_tester import (
+    from strategies.test.strategy_tester import (
         Strategy, BacktestConfig, run_backtest, print_result
     )
-    from momentum.momentum_tools import macd, adx, crossover
+    from strategies.tools.momentum_tools import macd, adx, crossover
 
     class MACDStrategy(Strategy):
         name = "MACD + ADX Filter"
@@ -59,7 +59,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from momentum.momentum_tools import (
+from strategies.tools.momentum_tools import (
     sharpe_ratio, sortino_ratio, max_drawdown, calmar_ratio,
     cagr, win_rate, kelly_criterion, volatility, atr,
 )
@@ -94,8 +94,8 @@ class Strategy(ABC):
            strategy is designed for (used by the paper trader).
 
     Code example
-        >>> from momentum.test.strategy_tester import Strategy
-        >>> from momentum.momentum_tools import rsi, crossover
+        >>> from strategies.test.strategy_tester import Strategy
+        >>> from strategies.tools.momentum_tools import rsi, crossover
         >>>
         >>> class RSIStrategy(Strategy):
         ...     name = "RSI Mean Reversion"
@@ -177,7 +177,7 @@ class BacktestConfig:
           drops below this threshold (simulates a circuit-breaker rule).
 
     Code example
-        >>> from momentum.test.strategy_tester import BacktestConfig
+        >>> from strategies.test.strategy_tester import BacktestConfig
         >>> cfg = BacktestConfig(
         ...     initial_capital=50_000,
         ...     commission_per_share=0.005,
@@ -342,7 +342,7 @@ def run_backtest(
         historically?"
 
     How to use (code)
-        >>> from momentum.test.strategy_tester import run_backtest, BacktestConfig
+        >>> from strategies.test.strategy_tester import run_backtest, BacktestConfig
         >>> import pandas as pd
         >>> df = pd.read_csv("AAPL.csv", parse_dates=["Date"], index_col="Date")
         >>> cfg = BacktestConfig(initial_capital=100_000)
@@ -720,7 +720,7 @@ def run_comparison(
         - Before choosing a strategy to deploy in the paper trader.
 
     Code example
-        >>> from momentum.test.strategy_tester import run_comparison, compare_results
+        >>> from strategies.test.strategy_tester import run_comparison, compare_results
         >>> results = run_comparison(
         ...     {"MACD": MACDStrategy(), "RSI": RSIStrategy(), "ADX": ADXStrategy()},
         ...     df,
@@ -800,7 +800,7 @@ def fetch_ibkr_history(
 
     Code example
         >>> from myIBApp import connect_to_tws
-        >>> from momentum.test.strategy_tester import fetch_ibkr_history
+        >>> from strategies.test.strategy_tester import fetch_ibkr_history
         >>> app = connect_to_tws()
         >>> df = fetch_ibkr_history(app, "AAPL", duration="1 Y", bar_size="1 day")
         >>> print(df.tail())
@@ -952,7 +952,7 @@ def print_result(result: BacktestResult) -> None:
         - When reviewing an individual strategy in isolation.
 
     Code example
-        >>> from momentum.test.strategy_tester import run_backtest, print_result
+        >>> from strategies.test.strategy_tester import run_backtest, print_result
         >>> result = run_backtest(MyStrategy(), df, cfg, symbol="AAPL")
         >>> print_result(result)
 
@@ -1007,7 +1007,7 @@ def compare_results(results: Dict[str, BacktestResult]) -> pd.DataFrame:
         - When presenting strategy results to a partner or reviewer.
 
     Code example
-        >>> from momentum.test.strategy_tester import run_comparison, compare_results
+        >>> from strategies.test.strategy_tester import run_comparison, compare_results
         >>> results = run_comparison({"MACD": s1, "RSI": s2}, df, cfg)
         >>> table = compare_results(results)
         >>> print(table.to_string())
@@ -1069,7 +1069,7 @@ def plot_equity_curve(
           dependency or overfitting.
 
     Code example
-        >>> from momentum.test.strategy_tester import run_backtest, plot_equity_curve
+        >>> from strategies.test.strategy_tester import run_backtest, plot_equity_curve
         >>> result = run_backtest(MyStrategy(), df, cfg, symbol="AAPL")
         >>> bm_returns = df["Close"] / df["Close"].iloc[0] * cfg.initial_capital
         >>> plot_equity_curve(result, benchmark=bm_returns)
@@ -1143,7 +1143,7 @@ class MACDMomentumStrategy(Strategy):
           strategies.
 
     Code example
-        >>> from momentum.test.strategy_tester import (
+        >>> from strategies.test.strategy_tester import (
         ...     MACDMomentumStrategy, BacktestConfig, run_backtest, print_result
         ... )
         >>> cfg    = BacktestConfig(initial_capital=100_000)
@@ -1154,7 +1154,7 @@ class MACDMomentumStrategy(Strategy):
     symbols = ["AAPL"]
 
     def generate_signals(self, df: pd.DataFrame) -> pd.DataFrame:
-        from momentum.momentum_tools import macd, adx, crossover, crossunder
+        from strategies.tools.momentum_tools import macd, adx, crossover, crossunder
 
         macd_line, sig_line, _ = macd(df["Close"])
         adx_vals, pdi, mdi = adx(df["High"], df["Low"], df["Close"])

@@ -77,7 +77,7 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 from myIBApp import myIBApp, connect_to_tws, disconnect_tws
-from momentum.test.strategy_tester import Strategy, fetch_ibkr_history
+from strategies.test.strategy_tester import Strategy, fetch_ibkr_history
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(

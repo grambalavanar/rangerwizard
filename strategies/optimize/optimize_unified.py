@@ -2,14 +2,19 @@
 optimize_unified.py
 ===================
 Genetic optimizer runner for UnifiedAlphaStrategy.
-Optimises regime classifier thresholds + both sub-strategy parameters
-simultaneously across a diverse multi-stock basket.
+Optimises ALL 52 parameters end-to-end simultaneously:
+  - 7  regime thresholds     (when to switch between strategies)
+  - 12 momentum indicators   (how the momentum strategy fires)
+  - 11 momentum weights      (which momentum signals dominate)
+  - 10 MR indicators         (how the MR strategy fires)
+  - 11 MR weights            (which MR signals dominate)
 
 Usage
 -----
-  python strategies/optimize/optimize_unified.py             # full run
-  python strategies/optimize/optimize_unified.py --fast      # smoke test
-  python strategies/optimize/optimize_unified.py --target AAPL --train-years 4 --val-years 2
+  python strategies/optimize/optimize_unified.py --thorough   # full deep run
+  python strategies/optimize/optimize_unified.py              # standard run
+  python strategies/optimize/optimize_unified.py --fast       # smoke test
+  python strategies/optimize/optimize_unified.py --target AAPL --train-years 5 --val-years 2
   python strategies/optimize/optimize_unified.py --validate SPY
 """
 
@@ -22,17 +27,20 @@ _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from strategies.unified_alpha import UnifiedAlphaStrategy, UNIFIED_PARAM_SPACE
+from strategies.alpha_composite import UnifiedAlphaStrategy, UNIFIED_PARAM_SPACE
 from strategies.test import (
     GeneticOptimizer, GAConfig, print_optimization_report, save_result,
     run_backtest, BacktestConfig, print_result, load_price_data,
 )
 
-parser = argparse.ArgumentParser(description="GA optimiser for UnifiedAlphaStrategy")
-parser.add_argument("--fast",        action="store_true")
+parser = argparse.ArgumentParser(description="GA optimiser for UnifiedAlphaStrategy (52 params)")
+parser.add_argument("--thorough",    action="store_true",
+                    help="Deep run: pop=50, gen=200, 12 symbols (~300k backtests, ~4-8 hrs)")
+parser.add_argument("--fast",        action="store_true",
+                    help="Smoke test: pop=10, gen=5, 3 symbols (~5 min)")
 parser.add_argument("--target",      default=None,  help="Single symbol (security-specific mode)")
-parser.add_argument("--train-years", default=4, type=int)
-parser.add_argument("--val-years",   default=1, type=int)
+parser.add_argument("--train-years", default=5, type=int)
+parser.add_argument("--val-years",   default=2, type=int)
 parser.add_argument("--validate",    default=None,  help="Post-run out-of-sample validation symbol")
 args = parser.parse_args()
 
@@ -62,7 +70,7 @@ if args.target:
         n_generations       = 5   if args.fast else 100,
         fitness_metric      = "sharpe",
         consistency_penalty = 0.0,
-        min_trades          = 3,
+        min_trades          = 1,
         n_workers           = 4,
         verbose             = True,
         years_of_data       = args.train_years,
@@ -105,26 +113,54 @@ if args.target:
 
 # ── Basket mode ────────────────────────────────────────────────────────────────
 else:
-    # Diverse 10-stock basket covering multiple sectors and volatility regimes.
-    # Spanning multiple regime types ensures the classifier is trained on all
-    # conditions and doesn't overfit to a single market environment.
     if args.fast:
         symbols = ["AAPL", "SPY", "AMD"]
         cfg = GAConfig(
             population_size = 10, n_generations = 5,
-            fitness_metric  = "robust", verbose = True,
+            fitness_metric  = "robust", min_trades = 1, verbose = True,
+        )
+    elif args.thorough:
+        # Maximum thoroughness — all 52 params, 12-stock basket, 200 generations.
+        # ~300,000 backtests. Runtime: 4–8 hours depending on CPU.
+        symbols = [
+            "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN",   # mega-cap tech
+            "SPY",  "QQQ",  "IWM",                       # broad indices
+            "JPM",  "XOM",                                # financials / energy
+            "TSLA", "AMD",                                # high-vol / high-beta
+        ]
+        cfg = GAConfig(
+            population_size     = 50,
+            n_generations       = 200,
+            mutation_rate       = 0.12,
+            fitness_metric      = "robust",
+            consistency_penalty = 0.25,
+            # min_trades=1: allow GA to evaluate even sparse strategies.
+            # Strategies that rarely trade get poor Sharpe naturally and
+            # die out via selection. Setting this higher forces all-zero
+            # fitness for the random initial population, killing convergence.
+            min_trades          = 1,
+            n_workers           = 4,
+            verbose             = True,
+            years_of_data       = 5,
         )
     else:
+        # Standard run
         symbols = ["AAPL", "MSFT", "NVDA", "SPY", "QQQ",
                    "JPM", "XOM", "AMD", "AMZN", "V"]
         cfg = GAConfig(
-            population_size     = 30,
-            n_generations       = 100,
+            population_size     = 40,
+            n_generations       = 150,
             fitness_metric      = "robust",
-            consistency_penalty = 0.30,
+            consistency_penalty = 0.25,
+            min_trades          = 1,
             n_workers           = 4,
             verbose             = True,
+            years_of_data       = 4,
         )
+
+    print(f"\n  Training on {len(symbols)} symbols × {cfg.population_size} pop "
+          f"× {cfg.n_generations} gen = "
+          f"{len(symbols) * cfg.population_size * cfg.n_generations:,} backtests")
 
     opt = GeneticOptimizer(
         strategy_factory = UnifiedAlphaStrategy,
