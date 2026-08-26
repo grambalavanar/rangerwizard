@@ -1,95 +1,95 @@
-name: Daily Signal — Live Trading
+# name: Daily Signal — Live Trading
 
-# Runs at 9:45 AM ET every weekday (Mon–Fri).
-# EDT (Apr–Nov): 13:45 UTC  |  EST (Nov–Apr): 14:45 UTC
-# Update the minute/hour in March and November when clocks change.
+# # Runs at 9:45 AM ET every weekday (Mon–Fri).
+# # EDT (Apr–Nov): 13:45 UTC  |  EST (Nov–Apr): 14:45 UTC
+# # Update the minute/hour in March and November when clocks change.
 
-on:
-  schedule:
-    - cron: "45 13 * * 1-5"   # 9:45 AM EDT (Apr–Nov, UTC-4)
-    - cron: "45 14 * * 1-5"   # 9:45 AM EST (Nov–Mar, UTC-5)
-  workflow_dispatch:           # also allows manual "Run workflow" button in GitHub UI
+# on:
+#   schedule:
+#     - cron: "45 13 * * 1-5"   # 9:45 AM EDT (Apr–Nov, UTC-4)
+#     - cron: "45 14 * * 1-5"   # 9:45 AM EST (Nov–Mar, UTC-5)
+#   workflow_dispatch:           # also allows manual "Run workflow" button in GitHub UI
 
-jobs:
-  daily-signal:
-    # ─────────────────────────────────────────────────────────────────────────
-    # IMPORTANT: must be "self-hosted" — this job connects to IBKR TWS on
-    # 127.0.0.1:7496, which is only reachable on your local Mac.
-    # See setup instructions in this file's comments below.
-    # ─────────────────────────────────────────────────────────────────────────
-    runs-on: self-hosted
+# jobs:
+#   daily-signal:
+#     # ─────────────────────────────────────────────────────────────────────────
+#     # IMPORTANT: must be "self-hosted" — this job connects to IBKR TWS on
+#     # 127.0.0.1:7496, which is only reachable on your local Mac.
+#     # See setup instructions in this file's comments below.
+#     # ─────────────────────────────────────────────────────────────────────────
+#     runs-on: self-hosted
 
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+#     steps:
+#       - name: Check out repository
+#         uses: actions/checkout@v4
 
-      - name: Verify TWS is reachable
-        # Abort early with a clear message if TWS is not running.
-        run: |
-          python3.11 -c "
-          import socket, sys
-          s = socket.socket()
-          s.settimeout(3)
-          try:
-              s.connect(('127.0.0.1', 7496))
-              s.close()
-              print('TWS reachable on port 7496')
-          except Exception as e:
-              print(f'ERROR: Cannot reach TWS on 127.0.0.1:7496 — {e}')
-              print('Make sure IBKR TWS is running with API enabled before this workflow runs.')
-              sys.exit(1)
-          "
+#       - name: Verify TWS is reachable
+#         # Abort early with a clear message if TWS is not running.
+#         run: |
+#           python3.11 -c "
+#           import socket, sys
+#           s = socket.socket()
+#           s.settimeout(3)
+#           try:
+#               s.connect(('127.0.0.1', 7496))
+#               s.close()
+#               print('TWS reachable on port 7496')
+#           except Exception as e:
+#               print(f'ERROR: Cannot reach TWS on 127.0.0.1:7496 — {e}')
+#               print('Make sure IBKR TWS is running with API enabled before this workflow runs.')
+#               sys.exit(1)
+#           "
 
-      - name: Install / update Python dependencies
-        run: |
-          pip3.11 install --upgrade --break-system-packages \
-            pandas numpy scipy yfinance ibapi
+#       - name: Install / update Python dependencies
+#         run: |
+#           pip3.11 install --upgrade --break-system-packages \
+#             pandas numpy scipy yfinance ibapi
 
-      - name: Run daily signal (live)
-        run: |
-          cd ${{ github.workspace }}
-          python3.11 daily_signal.py --universe all --live
-        env:
-          # Prevents Python output buffering so logs appear in real time.
-          PYTHONUNBUFFERED: "1"
+#       - name: Run daily signal (live)
+#         run: |
+#           cd ${{ github.workspace }}
+#           python3.11 daily_signal.py --universe all --live
+#         env:
+#           # Prevents Python output buffering so logs appear in real time.
+#           PYTHONUNBUFFERED: "1"
 
-      - name: Upload logs as artifact
-        if: always()   # upload even if the signal step failed
-        uses: actions/upload-artifact@v4
-        with:
-          name: daily-signal-logs-${{ github.run_id }}
-          path: logs/
-          retention-days: 90
-          if-no-files-found: warn
+#       - name: Upload logs as artifact
+#         if: always()   # upload even if the signal step failed
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: daily-signal-logs-${{ github.run_id }}
+#           path: logs/
+#           retention-days: 90
+#           if-no-files-found: warn
 
-# =============================================================================
-# SELF-HOSTED RUNNER SETUP (one-time, on your Mac)
-# =============================================================================
-#
-# A self-hosted runner is a small background agent on your Mac that listens to
-# GitHub and executes workflow jobs locally. It has full access to 127.0.0.1
-# so it can reach TWS.
-#
-# Steps:
-#   1. Go to:  github.com/<your-username>/rangerwizard
-#              → Settings → Actions → Runners → New self-hosted runner
-#   2. Select macOS / ARM64, then follow the displayed commands:
-#        mkdir actions-runner && cd actions-runner
-#        curl -O -L https://github.com/actions/runner/releases/download/v2.x.x/actions-runner-osx-arm64-2.x.x.tar.gz
-#        tar xzf ./actions-runner-osx-arm64-2.x.x.tar.gz
-#        ./config.sh --url https://github.com/<user>/rangerwizard --token <TOKEN>
-#   3. Install as a macOS service (runs automatically on login, restarts on crash):
-#        ./svc.sh install
-#        ./svc.sh start
-#   4. Verify the runner appears as "Idle" on the GitHub Runners page.
-#
-# DST clock change:
-#   Both cron lines are always active — daily_signal.py guards against running
-#   outside the 9:30–10:15 AM ET window, so the "off-season" trigger exits
-#   immediately. No manual cron edits needed when clocks change.
-#
-# Market holidays:
-#   GitHub cron does not know about NYSE holidays (e.g. July 4, Thanksgiving).
-#   On those days TWS will be closed and daily_signal.py will fail gracefully
-#   (no data returned → symbols skipped → logged as ERROR). This is safe.
-# =============================================================================
+# # =============================================================================
+# # SELF-HOSTED RUNNER SETUP (one-time, on your Mac)
+# # =============================================================================
+# #
+# # A self-hosted runner is a small background agent on your Mac that listens to
+# # GitHub and executes workflow jobs locally. It has full access to 127.0.0.1
+# # so it can reach TWS.
+# #
+# # Steps:
+# #   1. Go to:  github.com/<your-username>/rangerwizard
+# #              → Settings → Actions → Runners → New self-hosted runner
+# #   2. Select macOS / ARM64, then follow the displayed commands:
+# #        mkdir actions-runner && cd actions-runner
+# #        curl -O -L https://github.com/actions/runner/releases/download/v2.x.x/actions-runner-osx-arm64-2.x.x.tar.gz
+# #        tar xzf ./actions-runner-osx-arm64-2.x.x.tar.gz
+# #        ./config.sh --url https://github.com/<user>/rangerwizard --token <TOKEN>
+# #   3. Install as a macOS service (runs automatically on login, restarts on crash):
+# #        ./svc.sh install
+# #        ./svc.sh start
+# #   4. Verify the runner appears as "Idle" on the GitHub Runners page.
+# #
+# # DST clock change:
+# #   Both cron lines are always active — daily_signal.py guards against running
+# #   outside the 9:30–10:15 AM ET window, so the "off-season" trigger exits
+# #   immediately. No manual cron edits needed when clocks change.
+# #
+# # Market holidays:
+# #   GitHub cron does not know about NYSE holidays (e.g. July 4, Thanksgiving).
+# #   On those days TWS will be closed and daily_signal.py will fail gracefully
+# #   (no data returned → symbols skipped → logged as ERROR). This is safe.
+# # =============================================================================
